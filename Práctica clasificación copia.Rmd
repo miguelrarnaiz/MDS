@@ -1,0 +1,156 @@
+---
+title: "PRÁCTICA GENDER"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+ setwd("~/Documents/MASTER/TÉCNICAS DE CLASIFICACIÓN/Prácticas/GENDER/GENDER")
+getwd()
+```
+Comprobamos el directorio de trabajo para cargar los datos.
+
+```{r}
+data <- read.csv("GenderDiscrimination.csv", header = T, sep = ",") 
+head(data)
+```
+
+```{r}
+library(partykit)
+library(rpart)
+library(party)
+library(rpart.plot)
+```
+Cargamos todas las librerias que necesitamos para hacer el trabajo.
+
+
+```{r}
+set.seed(1234)
+```
+Plantamos la semilla para que todos tengamos los mismos resultados.
+
+
+```{r}
+train = sample (nrow(data), 0.7 * nrow(data))
+```
+Hacemos una muestra de aprendizaje con el 70% de los datos.
+
+
+```{r}
+d.train = data[train,]
+d.validate = data[-train,]
+```
+
+Asi tenemos dividida la muestra en 2: la de aprendizaje y la de validacion.
+
+```{r}
+table(data$Gender) 
+```
+
+```{r}
+table(d.train$Gender) 
+```
+
+```{r}
+table(d.validate$Gender)
+```
+
+Con esto vemos que las meustras están balanceadas, es decir, que hay una proporcion muy similar de hombres y mujeres en ambas muestras, que coincide con la del total.
+
+```{r}
+arbol <- rpart(Gender ~ ., data=d.train, method="class",
+               parms=list(split="information"))
+```
+Cargamos el primer arbol para ver como saldria, pero seguramente no sea el definitivo porque tenemos que ver por donde podarlo.
+
+```{r}
+summary(arbol)
+```
+
+Aqui nos fijamos en la tabla inicial de errores, y vemos cual tiene el menor error. En este caso es el segundo, por lo que por ahi es por donde vamos a podar.
+
+```{r}
+arbol$cptable
+```
+Con este comando vemos solo la tabla de errores.
+
+```{r}
+plotcp(arbol)
+```
+
+Este grafico nos muestra tambien por donde cortar el arbol, y vemos que coincide con lo que dice la tabla anterior.
+
+```{r}
+arbol_podado= prune(arbol, cp=0.05813953)
+```
+Asi podamos el arbol con el cp que nos marcaba el minimo error.
+
+```{r}
+prp(arbol_podado, type=2, extra = 104,
+    fallen.leaves=TRUE, main= 'Gender Tree')
+```
+
+Aqui tenemos el arbol podadado, con 4 nodos terminales. Es el árbol con menor error que podemos hacer con la división de muestra que hemos hecho.
+
+```{r}
+plot(as.party(arbol_podado))
+
+```
+
+Este es el árbol que antes pero con un gráfico diferente. Este árbol es más intuitivo a la vista porque vemos en los nodos finales el porcenaje de acierto que tienen. Vemos que los nodos de los extremos están bien porque aciertan más de un 75%, pero los del centro son peores ya que están cercanos al 50%, lo que significaría que es como tirar una moneda para ver si es hombre o mujer.
+
+```{r}
+arbol_podado.pred <- predict(arbol_podado, d.validate, type="class")
+arbol_podado.pref<- table(d.validate$Gender, arbol_podado.pred,
+                    dnn=c("Real", "Predicted"))
+arbol_podado.pref
+```
+
+Aquí vemos la tabla de predicciones que hace nuestro arbol. Vemos que no es muy bueno porque por ejemplo,11 personas que son mujeres en ralidad, el modelo predice que son hombres. Esto son muchos errores para una muestra de 25 hombres y 38 mujeres.
+
+##Vamos a hacer el árbol basado en la inferencia a ver si mejora el modelo.
+
+```{r}
+fit.ctree <- ctree(Gender~., data=d.train)
+
+plot(fit.ctree, main="Conditional Inference Tree")
+```
+
+Vemos que el árbol ha salido más sencillo ya que sólo tiene 3 nodos finales.
+
+
+```{r}
+ctree.pred <- predict(fit.ctree, d.validate, type="response")
+ctree.perf <- table(d.validate$Gender, ctree.pred,
+                    dnn=c("Real", "Predicted"))
+
+ctree.perf
+```
+
+Aquí vemos la predicción de este modelo. Acierta en más hombres pero falla en más mujeres por lo que no vemos que el modelo sea mejor. De hecho, ambos modelos fallan en 23 individuos, por lo que podríamos concluir que los dos son iguales, ya que en este caso concreto no hay un error más importante que otro.
+
+
+##Conclusión:
+
+No se se deberían sacar muchas conclusiones de este dataset ya que son sólo 208 observaciones y no sabemos a que población corresponden. Teniendo esto en cuenta, vemos que hay una tendencia clara a que cuanto mayor sea el salario, el sujeto va a ser un hmbre, sin tener en cuenta los años de experiencia. Esto nos da la idea de que siendo hombre es más fácil acceder a un salario mayor sin tener en cuenta la experiencia de años trabajados.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
